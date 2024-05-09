@@ -2,6 +2,7 @@
 #ifndef CCV_PURE_PURSUIT_STEERING_H
 #define CCV_PURE_PURSUIT_STEERING_H
 
+//ros
 #include<ros/ros.h>
 #include<ccv_dynamixel_msgs/CmdPoseByRadian.h>
 #include<nav_msgs/Path.h>  // Express velocity in terms of linear and angular components , Vector3
@@ -12,6 +13,11 @@
 #include<tf2_ros/transform_listener.h>
 #include<geometry_msgs/TransformStamped.h>
 #include<geometry_msgs/Pose2D.h>
+
+//ipopt
+#include <Eigen/Core>
+#include<cppad/cppad.hpp>
+#include<cppad/ipopt/solve.hpp>
 
 class CcvMpcSteering
 {

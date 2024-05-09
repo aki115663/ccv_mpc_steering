@@ -5,6 +5,7 @@ CcvMpcSteering::CcvMpcSteering():private_nh_("~"), tf_listener_(tf_buffer_)
     //param
     private_nh_.param("hz", hz_, {30});
     private_nh_.param("pitch_offset", PITCH_OFFSET_, {3.0*M_PI/180.0});
+    private_nh_.param("")
 
     //subscriber
     sub_path_=nh_.subscribe("/predicted_path", 10, &CcvMpcSteering::predicted_trajectory_callback, this, ros::TransportHints().tcpNoDelay());

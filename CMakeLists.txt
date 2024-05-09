@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.0.2)
+# cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.14)
 project(ccv_mpc_steering)
+set(CMAKE_CXX_STANDARD 17)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -19,6 +21,16 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   rospy
 )
+find_package(Eigen3 REQUIRED COMPONENTS system)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(IPOPT ipopt)
+
+if(${IPOPT_FOUND})
+  message("-- ${ESC}[32mIPOPT was found!!!${ESC}[0m")
+else()
+  message("-- ${ESC}[31mIPOPT was NOT found!!!${ESC}[0m")
+  message("-- ${ESC}[031mMPC nodes will not be built${ESC}[0m")
+endif()
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -125,6 +137,8 @@ catkin_package(
 include_directories(
 include
   ${catkin_INCLUDE_DIRS}
+  ${Eigen3_INCLUDE_DIRS}
+  ${IPOPT_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -141,7 +155,7 @@ include
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(ccv_mpc_steering src/ccv_mpc_steering.cpp)
-
+target_compile_definitions(ccv_mpc_steering PRIVATE HAVE_STDDEF_H)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
