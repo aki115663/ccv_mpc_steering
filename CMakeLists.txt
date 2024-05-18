@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   geometry_msgs
+  tf
   tf2
   tf2_ros
   geometry_msgs
@@ -169,6 +170,12 @@ target_compile_definitions(ccv_mpc_steering PRIVATE HAVE_STDDEF_H)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(ccv_mpc_steering ${catkin_LIBRARIES})
 
+if(${IPOPT_FOUND})
+  target_link_libraries(ccv_mpc_steering
+    ${catkin_LIBRARIES}
+    ${IPOPT_LIBRARIES}
+  )
+  endif()
 #############
 ## Install ##
 #############

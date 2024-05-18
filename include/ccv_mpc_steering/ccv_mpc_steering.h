@@ -1,4 +1,3 @@
-
 #ifndef CCV_PURE_PURSUIT_STEERING_H
 #define CCV_PURE_PURSUIT_STEERING_H
 
@@ -11,125 +10,161 @@
 #include<geometry_msgs/PoseStamped.h>
 #include<visualization_msgs/Marker.h>
 #include<tf2_ros/transform_listener.h>
+#include <tf2/utils.h>
+
 #include<geometry_msgs/TransformStamped.h>
 #include<geometry_msgs/Pose2D.h>
+#include <sensor_msgs/JointState.h>
 
 //ipopt
 #include <Eigen/Core>
 #include<cppad/cppad.hpp>
 #include<cppad/ipopt/solve.hpp>
 
-class CcvMpcSteering
+class MPC
+{
+    public:
+    MPC(int HORIZON_T_, std::vector<double> bounds)
+    {
+        vars_bounds = bounds;
+        T=HORIZON_T_;
+        //state
+        x_start = 0;
+        y_start = x_start + T;
+        yaw_start = y_start + T;
+        v_start = yaw_start + T;
+        omega_start = v_start + T;
+        omega_l_start = omega_start + T;
+        omega_r_start = omega_l_start + T;
+        steer_l_start = omega_r_start + T;
+        steer_r_start = steer_l_start + T;
+        //input
+        domega_l_start = steer_r_start + T;
+        domega_r_start = domega_l_start + T;
+        dsteer_l_start = domega_r_start + T;
+        dsteer_r_start = dsteer_l_start + T-1;
+        // 7(x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r), 4(domega_l, domega_r, dsteer_l, dsteer_r)
+        
+    };
+    ~MPC(void){};
+    // horizon_t, state, ref_x, ref_y, ref_yaw
+    // std::vector<double> solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
+    int solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
+
+    private:
+    typedef CPPAD_TESTVECTOR(double) Dvector;
+    int T;
+    size_t x_start = 0;
+    size_t y_start;
+    size_t yaw_start;
+    size_t v_start;
+    size_t omega_start;
+    size_t omega_l_start;
+    size_t omega_r_start;
+    size_t steer_l_start;
+    size_t steer_r_start;
+    size_t domega_l_start;
+    size_t domega_r_start;
+    size_t dsteer_l_start;
+    size_t dsteer_r_start;
+    std::vector<double> vars_bounds;
+
+    int failure_count = 0;
+    std::vector<double> result;
+
+    void set_vars_bounds(Dvector);
+};
+class MpcPathTracker
 {
 public:
-    CcvMpcSteering();
-    ~CcvMpcSteering();
-    void process();
+    MpcPathTracker(void);
+    ~MpcPathTracker(void){};
+    void process(void);
 
 private:
-
-    int hz_;
+    //周期
+    double HZ_;
+    double DT_=0.1;
+    //ホライゾン長さ
+    int HORIZON_T_;
+    //目標速度
+    double VREF_;
+    //最大速度
+    double MAX_VELOCITY_;
+    //最大角速度
+    double MAX_ANGULAR_VELOCITY_;
+    //ホイール角加速度
+    double WHEEL_ANGULAR_ACCELERATION_LIMIT_;
+    //ホイール角速度
+    double WHEEL_ANGULAR_VELOCITY_LIMIT_;
+    //ステアリング角
+    double STEERING_ANGLE_LIMIT_;
+    //トレッド
+    double TREAD_;
+    //ホイール半径
+    double WHEEL_RADIUS_;
     double PITCH_OFFSET_;
-    // int NX = 4 // x = x, y, v, yaw
-    // int NU = 2  // a = [accel, steer]
-    // int T = 5  // horizon length
-    //
-    // // mpc parameters
-    // R = np.diag([0.01, 0.01])  // input cost matrix
-    // Rd = np.diag([0.01, 1.0])  // input difference cost matrix
-    // Q = np.diag([1.0, 1.0, 0.5, 0.5])  // state cost matrix
-    // Qf = Q  // state final matrix
-    // GOAL_DIS = 1.5  // goal distance
-    // STOP_SPEED = 0.5 / 3.6  // stop speed
-    // MAX_TIME = 500.0  // max simulation time
-    //
-    // // iterative paramter
-    // MAX_ITER = 3  // Max iteration
-    // DU_TH = 0.1  // iteration finish param
-    //
-    // TARGET_SPEED = 10.0 / 3.6  // [m/s] target speed
-    // N_IND_SEARCH = 10  // Search index number
-    //
-    // DT = 0.2  // [s] time tick
-    //
-    // // Vehicle parameters
-    // LENGTH = 4.5  // [m]
-    // WIDTH = 2.0  // [m]
-    // BACKTOWHEEL = 1.0  // [m]
-    // WHEEL_LEN = 0.3  // [m]
-    // WHEEL_WIDTH = 0.2  // [m]
-    // TREAD = 0.7  // [m]
-    // WB = 2.5  // [m]
-    //
-    // MAX_STEER = np.deg2rad(45.0)  // maximum steering angle [rad]
-    // MAX_DSTEER = np.deg2rad(30.0)  // maximum steering speed [rad/s]
-    // MAX_SPEED = 55.0 / 3.6  // maximum speed [m/s]
-    // MIN_SPEED = -20.0 / 3.6  // minimum speed [m/s]
-    // MAX_ACCEL = 1.0  // maximum accel [m/ss]
+    double GOAL_BORDER_;
+    //グリッドマップ分解能
+    double RESOLUTION_;
+    std::vector<double> vars_bounds;
 
-    void predicted_trajectory_callback(const nav_msgs::Path::ConstPtr &msg);
-    void trajectory_marker_callback(const visualization_msgs::Marker::ConstPtr &msg);
+    void path_callback(const nav_msgs::Path::ConstPtr&);
+    void joint_states_callback(const sensor_msgs::JointState::ConstPtr&);
+    bool update_current_pose(void);
+    void update_current_state(Eigen::VectorXd&);
+    void path_to_vector(void);
 
-    //member
-    nav_msgs::Path predicted_path_;
-    double target_velocity_;
     bool have_received_path_=false;
-    bool have_reached_goal_=false;
-    bool read_marker_;
+    bool first_transform=true;
+    bool transformed = false;
+    double last_time;
+    double steering_angle_l;
+    double steering_angle_r;
+    double omega_l;
+    double omega_r;
+    Eigen::VectorXd path_x;
+    Eigen::VectorXd path_y;
+    Eigen::VectorXd path_yaw;
+    size_t right_steering_joint_idx = std::numeric_limits<size_t>::max();
+    size_t left_steering_joint_idx = std::numeric_limits<size_t>::max();
+    size_t right_wheel_joint_idx = std::numeric_limits<size_t>::max();
+    size_t left_wheel_joint_idx = std::numeric_limits<size_t>::max();
+    ros::Time steer_sub_time;
+
     ros::NodeHandle nh_;
     ros::NodeHandle private_nh_;
     ros::Subscriber sub_path_;
-    ros::Subscriber sub_local_goal_;
+    ros::Subscriber sub_joint_states_;
     ros::Publisher pub_cmd_vel_;
     ros::Publisher pub_cmd_pos_;
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
-    geometry_msgs::Pose2D current_pose_;
+    geometry_msgs::TransformStamped tf;
+    nav_msgs::Path path_;
+    geometry_msgs::PoseStamped current_pose;
+    geometry_msgs::PoseStamped previous_pose;
+    geometry_msgs::Twist vel_;
+    ccv_dynamixel_msgs::CmdPoseByRadian cmd_pos_;
     std::string world_frame_id_;
     std::string robot_frame_id_;
+};
 
+class FG_eval{
+public:
+    FG_eval(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
 
-//#############################################################################
-//#############################################################################
-    // int hz_;
-    // double MAX_TARGET_VELOCITY_;
-    // double MAX_STEERING_ANGLE_;
-    // double TREAD_;
-    // double PITCH_OFFSET_;
-    // double GOAL_BORDER_;
-    //
-    // void predicted_trajectory_callback(const nav_msgs::Path::ConstPtr &msg);
-    // void update_carrots();
-    // void update_motion();
-    // void update_target_velocity();
-    // double calc_distance(const double &x1, const double &y1, const double &x2, const double &y2);
-    // double calc_steering_angle(double r, double delta, double a, char side);
-    // double calc_turn_radius(double r, double delta, double a, char side);
-    // void flip_velocity(double &delta, double &velocity);
-    //
-    // //member
-    // nav_msgs::Path predicted_path_;
-    // double target_velocity_;
-    // bool have_received_path_=false;
-    // bool have_reached_goal_=false;
-    // bool read_marker_;
-    // ros::NodeHandle nh_;
-    // ros::NodeHandle private_nh_;
-    // ros::Subscriber sub_path_;
-    // ros::Subscriber sub_local_goal_;
-    // ros::Subscriber sub_marker_;
-    // ros::Publisher pub_cmd_vel_;
-    // ros::Publisher pub_cmd_pos_;
-    // tf2_ros::Buffer tf_buffer_;
-    // tf2_ros::TransformListener tf_listener_;
-    // geometry_msgs::Pose2D current_pose_;
-    // std::string world_frame_id_;
-    // std::string robot_frame_id_;
-    //
-    // //debug
-    // ros::Publisher pub_carrot1_;
-    // ros::Publisher pub_carrot2_;
-    // ros::Publisher pub_cx_line_;
-    // nav_msgs::Path cx_line_;
+    typedef CPPAD_TESTVECTOR(CppAD::AD<double>) ADvector;
+
+    void operator()(ADvector&, const ADvector&);
+
+private:
+    Eigen::VectorXd ref_x;
+    Eigen::VectorXd ref_y;
+    Eigen::VectorXd ref_yaw;
+
 };
 #endif //CCV_PURE_PURSUIT_STEERING_H
+
+
+

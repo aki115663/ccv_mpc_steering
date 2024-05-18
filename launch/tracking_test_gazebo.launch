@@ -80,7 +80,6 @@
     <!-- </node> -->
 
     <node name="mpc_steering" pkg="ccv_mpc_steering" type="ccv_mpc_steering" output="screen">
-        <remap from="/predicted_path" to="/local_path"/>
         <remap from="/local/cmd_vel" to="/sq2_ccv/diff_drive_steering_controller/cmd_vel"/>
     </node>
 
