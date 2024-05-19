@@ -16,13 +16,17 @@ MpcPathTracker::MpcPathTracker():private_nh_("~"), tf_listener_(tf_buffer_)
     private_nh_.param("pitch_offset", PITCH_OFFSET_, {3.0 * M_PI / 180.0});
     private_nh_.param("vref", VREF_, {1.2});
     private_nh_.param("resolution", RESOLUTION_, {0.1});
-    private_nh_.param("max_velocity", MAX_VELOCITY_, {1.5});
-    private_nh_.param("max_angular_velocity", MAX_ANGULAR_VELOCITY_, {1.0});
-    private_nh_.param("max_wheel_angular_acceleration", WHEEL_ANGULAR_ACCELERATION_LIMIT_, {3.14});
-    private_nh_.param("max_wheel_angular_velocity", WHEEL_ANGULAR_VELOCITY_LIMIT_, {1.57}); //要確認
+    private_nh_.param("x_bound", X_BOUND_, {1.0e19});
+    private_nh_.param("y_bound", Y_BOUND_, {1.0e19});
+    private_nh_.param("yaw_bound", YAW_BOUND_, {1.0e19});
+    private_nh_.param("v_bound", V_BOUND_, {1.5});
+    private_nh_.param("omega_bound", OMEGA_BOUND_, {1.0});
+    private_nh_.param("omega_r_bound", OMEGA_R_BOUND_, {3.14});
+    private_nh_.param("omega_l_bound", OMEGA_L_BOUND_, {3.14}); 
+    private_nh_.param("steer_r_bound", STEER_R_BOUND, {1.57}); //要確認
     private_nh_.param("max_steering_angle", STEERING_ANGLE_LIMIT_, {20*M_PI/180});
 
-    vars_bounds={MAX_VELOCITY_, MAX_ANGULAR_VELOCITY_, WHEEL_ANGULAR_ACCELERATION_LIMIT_, WHEEL_ANGULAR_VELOCITY_LIMIT_, STEERING_ANGLE_LIMIT_};
+    vars_bound={MAX_VELOCITY_, MAX_ANGULAR_VELOCITY_, WHEEL_ANGULAR_ACCELERATION_LIMIT_, WHEEL_ANGULAR_VELOCITY_LIMIT_, STEERING_ANGLE_LIMIT_};
 
 
     // subscriber
@@ -35,6 +39,23 @@ MpcPathTracker::MpcPathTracker():private_nh_("~"), tf_listener_(tf_buffer_)
     path_x = Eigen::VectorXd::Zero(HORIZON_T_);
     path_y = Eigen::VectorXd::Zero(HORIZON_T_);
     path_yaw = Eigen::VectorXd::Zero(HORIZON_T_);
+
+    //states
+    mpc_states.push_buck("x");
+    mpc_states.push_back("y");
+    mpc_states.push_back("yaw");
+    mpc_states.push_back("v");
+    mpc_states.push_back("omega");
+    mpc_states.push_back("omega_r");
+    mpc_states.push_back("omega_l");
+    mpc_states.push_back("steer_r");
+    mpc_states.push_back("steer_l");
+    //inputs
+    mpc_inputs.push_back("domega_r")
+    mpc_inputs.push_back("domega_l")
+    mpc_inputs.push_back("dsteer_r")
+    mpc_inputs.push_back("dsteer_l")
+    
     
 }
 
@@ -101,7 +122,7 @@ bool MpcPathTracker::update_current_pose()
     return transformed;
 }
 
-void MpcPathTracker::update_current_state(Eigen::VectorXd& state){
+void MpcPathTracker::update_current_state(Eigen::VectorXd& current_state){
     double current_time = ros::Time::now().toSec();
     double dt = current_time - last_time;
     last_time = current_time;
@@ -111,7 +132,7 @@ void MpcPathTracker::update_current_state(Eigen::VectorXd& state){
     double v = sqrt(dx * dx + dy * dy) / dt;
     double omega = dyaw / dt;
     //x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r
-    state << 0, 0, tf2::getYaw(current_pose.pose.orientation), v, omega, omega_l, omega_r, steering_angle_l, steering_angle_r;
+    current_state << 0, 0, tf2::getYaw(current_pose.pose.orientation), v, omega, omega_l, omega_r, steering_angle_l, steering_angle_r;
 }
 
 void MpcPathTracker::path_to_vector(void){
@@ -133,22 +154,28 @@ void MpcPathTracker::path_to_vector(void){
 
 
 
-int MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eigen::VectorXd ref_y, Eigen::VectorXd ref_yaw)
-// std::vector<double> MPC::solve(int HORIZON_T_, Eigen::VectorXd state, Eigen::VectorXd ref_x, Eigen::VectorXd ref_y, Eigen::VectorXd ref_yaw)
+int MPC::solve(Eigen::VectorXd current_state, Eigen::VectorXd ref_x, Eigen::VectorXd ref_y, Eigen::VectorXd ref_yaw)
+// std::vector<double> MPC::solve(int HORIZON_T_, Eigen::VectorXd current_state, Eigen::VectorXd ref_x, Eigen::VectorXd ref_y, Eigen::VectorXd ref_yaw)
 {
-    //state = {x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r}
+    //current_state = {x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r} 計9
     bool ok = true;
     size_t i;
 
-    double x = state[0];
-    double y = state[1];
-    double yaw = state[2];
-    double v = state[3];
-    double omega = state[4];
-    double omega_l = state[5];
-    double omega_r = state[6];
-    double steer_l = state[7];
-    double steer_r = state[8];
+    // double x = current_state[0];
+    // double y = current_state[1];
+    // double yaw = current_state[2];
+    // double v = current_state[3];
+    // double omega = current_state[4];
+    // double omega_l = current_state[5];
+    // double omega_r = current_state[6];
+    // double steer_l = current_state[7];
+    // double steer_r = current_state[8];
+    if(!(current_state.size() == states.size())) ROS_WARN_STREAM("Unknown States");
+    else{
+        size_t n_variables = states.size() * T + inputs.size() * (T-1);
+        size_t n_constraints = states.size() * T; 
+    }
+
 
     // 7(x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r), 4(domega_l, domega_r, dsteer_l, dsteer_r)
     size_t n_variables = 9 * T + 4 * (T - 1);
@@ -245,7 +272,6 @@ void MpcPathTracker::process()
                 }
                 else
                 {
-                    MPC mpc(HORIZON_T_);
                     double current_time = ros::Time::now().toSec();
                     double dt = current_time - last_time;
                     last_time = current_time;
@@ -256,6 +282,7 @@ void MpcPathTracker::process()
                     // std::cout<<"path_x :\n"<<path_x<<std::endl;
                     // std::cout<<"path_y :\n"<<path_y<<std::endl;
                     // std::cout<<"path_yaw:\n"<<path_yaw<<std::endl;
+                    MPC mpc(HORIZON_T_, mpc_states, mpc_inputs);
                     auto result=mpc.solve(current_state, path_x, path_y, path_yaw);
                 }
                 previous_pose = current_pose;

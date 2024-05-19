@@ -24,30 +24,36 @@
 class MPC
 {
     public:
-    MPC(int HORIZON_T_, std::vector<double> bounds)
+    MPC(int HORIZON_T_, std::vector<std::string> state, std::vector<std::string> input, std::vector<double> bound)
     {
-        vars_bounds = bounds;
         T=HORIZON_T_;
         //state
-        x_start = 0;
-        y_start = x_start + T;
-        yaw_start = y_start + T;
-        v_start = yaw_start + T;
-        omega_start = v_start + T;
-        omega_l_start = omega_start + T;
-        omega_r_start = omega_l_start + T;
-        steer_l_start = omega_r_start + T;
-        steer_r_start = steer_l_start + T;
-        //input
-        domega_l_start = steer_r_start + T;
-        domega_r_start = domega_l_start + T;
-        dsteer_l_start = domega_r_start + T;
-        dsteer_r_start = dsteer_l_start + T-1;
+        // x_start = 0;
+        // y_start = x_start + T;
+        // yaw_start = y_start + T;
+        // v_start = yaw_start + T;
+        // omega_start = v_start + T;
+        // omega_l_start = omega_start + T;
+        // omega_r_start = omega_l_start + T;
+        // steer_l_start = omega_r_start + T;
+        // steer_r_start = steer_l_start + T;
+        // //input
+        // domega_l_start = steer_r_start + T;
+        // domega_r_start = domega_l_start + T;
+        // dsteer_l_start = domega_r_start + T;
+        // dsteer_r_start = dsteer_l_start + T-1;
         // 7(x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r), 4(domega_l, domega_r, dsteer_l, dsteer_r)
+
+        this->state = state;
+        this->input = input;
+        this->bound = bound;
+        
+        
         
     };
     ~MPC(void){};
-    // horizon_t, state, ref_x, ref_y, ref_yaw
+
+    // state, ref_x, ref_y, ref_yaw
     // std::vector<double> solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
     int solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
 
@@ -67,7 +73,9 @@ class MPC
     size_t domega_r_start;
     size_t dsteer_l_start;
     size_t dsteer_r_start;
-    std::vector<double> vars_bounds;
+    std::vector<double> bound;
+    std::vector<std::string> state;
+    std::vector<std::string> input;
 
     int failure_count = 0;
     std::vector<double> result;
@@ -107,7 +115,7 @@ private:
     double GOAL_BORDER_;
     //グリッドマップ分解能
     double RESOLUTION_;
-    std::vector<double> vars_bounds;
+    std::vector<double> vars_bound;
 
     void path_callback(const nav_msgs::Path::ConstPtr&);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr&);
@@ -131,6 +139,10 @@ private:
     size_t right_wheel_joint_idx = std::numeric_limits<size_t>::max();
     size_t left_wheel_joint_idx = std::numeric_limits<size_t>::max();
     ros::Time steer_sub_time;
+
+    std::vector<std::string> mpc_states;
+    std::vector<std::string> mpc_inputs;
+
 
     ros::NodeHandle nh_;
     ros::NodeHandle private_nh_;
