@@ -220,8 +220,6 @@ std::vector<double> MPC::solve(Eigen::VectorXd current_state, Eigen::VectorXd re
     //目的関数と制約を評価するオブジェクト
     FG_eval fg_eval(ref_x, ref_y, ref_yaw);
     
-
-    std::cout << "======HERE=====" << std::endl;
     ////////////////////////////////////////////////////////////////////////////
     int x_start = 0;
     int y_start = x_start + T;
@@ -564,20 +562,6 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "ccv_mpc_steering");
     ros::NodeHandle local_nh("~");
 
-    // local_nh.getParam("HORIZON_T", T);
-    // local_nh.getParam("/dynamic_avoidance/VREF", VREF);
-    // local_nh.getParam("/dynamic_avoidance/MAX_ANGULAR_VELOCITY", MAX_ANGULAR_VELOCITY);
-    // local_nh.getParam("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT);
-    // local_nh.getParam("/diff_drive/MAX_WHEEL_ANGULAR_VELOCITY", WHEEL_ANGULAR_VELOCITY_LIMIT);
-    // local_nh.getParam("/diff_drive/WHEEL_RADIUS", WHEEL_RADIUS);
-    // local_nh.getParam("/diff_drive/TREAD", TREAD);
-    // local_nh.getParam("/diff_drive/MAX_VELOCITY", MAX_VELOCITY);
-    // local_nh.getParam("/dynamic_avoidance/RESOLUTION", RESOLUTION);
-    // local_nh.getParam("/dynamic_avoidance/ROBOT_FRAME", ROBOT_FRAME);
-    // local_nh.getParam("/dynamic_avoidance/WORLD_FRAME", WORLD_FRAME);
-    // local_nh.getParam("/dynamic_avoidance/VELOCITY_TOPIC_NAME", VELOCITY_TOPIC_NAME);
-    // local_nh.getParam("/dynamic_avoidance/INTERMEDIATE_PATH_TOPIC_NAME", INTERMEDIATE_PATH_TOPIC_NAME);
-
     local_nh.param("HORIZON_T", T, {15});
     local_nh.param("/dynamic_avoidance/WORLDT_FRAME", WORLD_FRAME, {"odom"});
     local_nh.param("/dynamic_avoidance/ROBOT_FRAME", ROBOT_FRAME, {"base_link"});
@@ -608,8 +592,6 @@ int main(int argc, char** argv)
     std::cout << "WORLD_FRAME: " << WORLD_FRAME << std::endl;
     std::cout << "VELOCITY_TOPIC_NAME: " << VELOCITY_TOPIC_NAME << std::endl;
     std::cout << "INTERMEDIATE_PATH_TOPIC_NAME: " << INTERMEDIATE_PATH_TOPIC_NAME << std::endl;
-
-
     
     MPCPathTracker mpc_path_tracker;
 
@@ -643,8 +625,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     double omega_r = state[5];
     double omega_l = state[6];
 
-
-    /*
+    
     std::cout << "--- state ---" << std::endl;
     std::cout << state << std::endl;
     std::cout << "--- path_x ---" << std::endl;
@@ -653,7 +634,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     std::cout << ref_y << std::endl;
     std::cout << "--- path_yaw ---" << std::endl;
     std::cout << ref_yaw << std::endl;
-    */
+    
 
     // 7(x, y, yaw, v, omega, omega_r, omega_l), 2(domega_r, domega_l)
     size_t n_variables = 7 * T + 2 * (T - 1);
@@ -675,7 +656,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
 
     Dvector vars_lower_bound(n_variables);
     Dvector vars_upper_bound(n_variables);
-    //std::cout<<"- - -HERE- - -"<<std::endl;
+    
     Dvector constraints_lower_bound(n_constraints);
     Dvector constraints_upper_bound(n_constraints);
 
@@ -699,7 +680,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
         vars_lower_bound[i] = -WHEEL_ANGULAR_VELOCITY_LIMIT;
         vars_upper_bound[i] = WHEEL_ANGULAR_VELOCITY_LIMIT;
     }
-    for(int i=omega_start;i<n_variables;i++){
+    for(int i=domega_r_start;i<n_variables;i++){
         // domega_r, domega_l
         vars_lower_bound[i] = -WHEEL_ANGULAR_ACCELERATION_LIMIT;
         vars_upper_bound[i] = WHEEL_ANGULAR_ACCELERATION_LIMIT;
@@ -716,7 +697,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     
 
     // t=0の設定
-    //std::cout << "--- HERE ---" << std::endl;
+    
     constraints_lower_bound[x_start] = x;
     constraints_lower_bound[y_start] = y;
     constraints_lower_bound[yaw_start] = yaw;
@@ -732,7 +713,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     constraints_upper_bound[omega_start] = omega;
     constraints_upper_bound[omega_r_start] = omega_r;
     constraints_upper_bound[omega_l_start] = omega_l;
-    //std::cout << "--- HERE ---" << std::endl;
+    
 
     FG_eval fg_eval(ref_x, ref_y, ref_yaw);
 
