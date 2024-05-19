@@ -463,7 +463,6 @@ using CppAD::AD;
 class MPC{
 public:
     MPC();
-
     // state, ref_x, ref_y, ref_yaw
     std::vector<double> solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
 
@@ -589,7 +588,12 @@ int main(int argc, char** argv)
     local_nh.param("/dynamic_avoidance/VREF", VREF, {1.2});
     //local_nh_.param("resolution", RESOLUTION_, {0.1});
     local_nh.param("/dynamic_avoidance/MAX_ANGULAR_VELOCITY", MAX_ANGULAR_VELOCITY, {3.14});
-    local_nh.getParam("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT);
+    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT, {3.14});
+    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_VELOCITY", WHEEL_ANGULAR_VELOCITY_LIMIT, {3.14});
+    local_nh.param("/diff_drive/MAX_VELOCITY", MAX_VELOCITY, {1.2});
+    local_nh.param("/dynamic_avoidance/RESOLUTION", RESOLUTION, {0.1});
+    local_nh.param("/dynamic_avoidance/VELOCITY_TOPIC_NAME", VELOCITY_TOPIC_NAME, {"/sq2_ccv2/diff_drive_steering/cmd_vel"});
+    local_nh.param("/dynamic_avoidance/INTERMEDIATE_PATH_TOPIC_NAME", INTERMEDIATE_PATH_TOPIC_NAME, {"/local_path"});
 
     std::cout << "T: " << T << std::endl;
     std::cout << "VREF: " << VREF << std::endl;
