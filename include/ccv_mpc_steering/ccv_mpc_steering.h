@@ -27,60 +27,46 @@ class MPC
     MPC(int HORIZON_T_, std::vector<std::string> state, std::vector<std::string> input, std::vector<double> bound)
     {
         T=HORIZON_T_;
-        //state
-        // x_start = 0;
-        // y_start = x_start + T;
-        // yaw_start = y_start + T;
-        // v_start = yaw_start + T;
-        // omega_start = v_start + T;
-        // omega_l_start = omega_start + T;
-        // omega_r_start = omega_l_start + T;
-        // steer_l_start = omega_r_start + T;
-        // steer_r_start = steer_l_start + T;
-        // //input
-        // domega_l_start = steer_r_start + T;
-        // domega_r_start = domega_l_start + T;
-        // dsteer_l_start = domega_r_start + T;
-        // dsteer_r_start = dsteer_l_start + T-1;
-        // 7(x, y, yaw, v, omega, omega_l, omega_r, steer_l, steer_r), 4(domega_l, domega_r, dsteer_l, dsteer_r)
-
         this->state = state;
         this->input = input;
         this->bound = bound;
         
-        
-        
     };
     ~MPC(void){};
 
-    // state, ref_x, ref_y, ref_yaw
-    // std::vector<double> solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
-    int solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
+                            // state,           ref_x,              ref_y,          ref_yaw
+    std::vector<double> solve(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
 
     private:
     typedef CPPAD_TESTVECTOR(double) Dvector;
     int T;
-    size_t x_start = 0;
-    size_t y_start;
-    size_t yaw_start;
-    size_t v_start;
-    size_t omega_start;
-    size_t omega_l_start;
-    size_t omega_r_start;
-    size_t steer_l_start;
-    size_t steer_r_start;
-    size_t domega_l_start;
-    size_t domega_r_start;
-    size_t dsteer_l_start;
-    size_t dsteer_r_start;
     std::vector<double> bound;
     std::vector<std::string> state;
     std::vector<std::string> input;
-
     int failure_count = 0;
     std::vector<double> result;
 
     void set_vars_bounds(Dvector);
+};
+
+class FG_eval{
+public:     //ref_x,              ref_y,          ref_yaw
+    FG_eval(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
+
+    typedef CPPAD_TESTVECTOR(CppAD::AD<double>) ADvector;
+
+    void operator()(ADvector&, const ADvector&);
+
+private:
+    int T=15;
+    double DT=0.1;
+    double VREF=1.2;
+    double WHEEL_RADIUS=0.15;
+    double TREAD=0.5;
+    Eigen::VectorXd ref_x;
+    Eigen::VectorXd ref_y;
+    Eigen::VectorXd ref_yaw;
+
 };
 class MpcPathTracker
 {
@@ -97,16 +83,26 @@ private:
     int HORIZON_T_;
     //目標速度
     double VREF_;
+    //目標位置
+    double X_BOUND_;
+    double Y_BOUND_;
+    double YAW_BOUND_;
     //最大速度
-    double MAX_VELOCITY_;
+    double V_BOUND_;
     //最大角速度
-    double MAX_ANGULAR_VELOCITY_;
-    //ホイール角加速度
-    double WHEEL_ANGULAR_ACCELERATION_LIMIT_;
+    double OMEGA_BOUND_;
     //ホイール角速度
-    double WHEEL_ANGULAR_VELOCITY_LIMIT_;
-    //ステアリング角
-    double STEERING_ANGLE_LIMIT_;
+    double OMEGA_R_BOUND_;
+    double OMEGA_L_BOUND_;
+    //ステア角
+    double STEER_R_BOUND_;
+    double STEER_L_BOUND_;
+    //ホイール角加速度
+    double DOMEGA_R_BOUND_;
+    double DOMEGA_L_BOUND_;
+    //ステア角速度
+    double DSTEER_R_BOUND_;
+    double DSTEER_L_BOUND_;
     //トレッド
     double TREAD_;
     //ホイール半径
@@ -115,8 +111,10 @@ private:
     double GOAL_BORDER_;
     //グリッドマップ分解能
     double RESOLUTION_;
-    std::vector<double> vars_bound;
 
+    std::vector<double> mpc_bound;
+    std::vector<std::string> mpc_state;
+    std::vector<std::string> mpc_input;
     void path_callback(const nav_msgs::Path::ConstPtr&);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr&);
     bool update_current_pose(void);
@@ -140,10 +138,6 @@ private:
     size_t left_wheel_joint_idx = std::numeric_limits<size_t>::max();
     ros::Time steer_sub_time;
 
-    std::vector<std::string> mpc_states;
-    std::vector<std::string> mpc_inputs;
-
-
     ros::NodeHandle nh_;
     ros::NodeHandle private_nh_;
     ros::Subscriber sub_path_;
@@ -162,20 +156,6 @@ private:
     std::string robot_frame_id_;
 };
 
-class FG_eval{
-public:
-    FG_eval(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
-
-    typedef CPPAD_TESTVECTOR(CppAD::AD<double>) ADvector;
-
-    void operator()(ADvector&, const ADvector&);
-
-private:
-    Eigen::VectorXd ref_x;
-    Eigen::VectorXd ref_y;
-    Eigen::VectorXd ref_yaw;
-
-};
 #endif //CCV_PURE_PURSUIT_STEERING_H
 
 
