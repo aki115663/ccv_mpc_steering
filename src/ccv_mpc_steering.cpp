@@ -508,6 +508,8 @@ private:
     Eigen::VectorXd path_yaw;
     bool first_transform = true;
     double last_time;
+    //degug
+    bool first_sub=true;
 
 };
 
@@ -569,12 +571,16 @@ int main(int argc, char** argv)
     local_nh.param("/diff_drive/WHEEL_RADIUS", WHEEL_RADIUS,{0.15});
     //local_nh_.param("goal_border", GOAL_BORDER_, {0.3});
     //local_nh_.param("pitch_offset", PITCH_OFFSET_, {3.0 * M_PI / 180.0});
-    local_nh.param("/dynamic_avoidance/VREF", VREF, {1.2});
+    local_nh.param("/dynamic_avoidance/VREF", VREF, {0.5});
+    //local_nh.param("/dynamic_avoidance/VREF", VREF, {1.2});
     //local_nh_.param("resolution", RESOLUTION_, {0.1});
     local_nh.param("/dynamic_avoidance/MAX_ANGULAR_VELOCITY", MAX_ANGULAR_VELOCITY, {3.14});
-    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT, {3.14});
-    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_VELOCITY", WHEEL_ANGULAR_VELOCITY_LIMIT, {3.14});
-    local_nh.param("/diff_drive/MAX_VELOCITY", MAX_VELOCITY, {1.2});
+    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT, {100});
+    //local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_ACCELERATION", WHEEL_ANGULAR_ACCELERATION_LIMIT, {3.14});
+    local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_VELOCITY", WHEEL_ANGULAR_VELOCITY_LIMIT, {100});
+    //local_nh.param("/diff_drive/MAX_WHEEL_ANGULAR_VELOCITY", WHEEL_ANGULAR_VELOCITY_LIMIT, {3.14});
+    local_nh.param("/diff_drive/MAX_VELOCITY", MAX_VELOCITY, {200});
+    //local_nh.param("/diff_drive/MAX_VELOCITY", MAX_VELOCITY, {1.2});
     local_nh.param("/dynamic_avoidance/RESOLUTION", RESOLUTION, {0.1});
     local_nh.param("/dynamic_avoidance/VELOCITY_TOPIC_NAME", VELOCITY_TOPIC_NAME, {"/sq2_ccv2/diff_drive_steering/cmd_vel"});
     local_nh.param("/dynamic_avoidance/INTERMEDIATE_PATH_TOPIC_NAME", INTERMEDIATE_PATH_TOPIC_NAME, {"/local_path"});
@@ -625,7 +631,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     double omega_r = state[5];
     double omega_l = state[6];
 
-    
+    /*
     std::cout << "--- state ---" << std::endl;
     std::cout << state << std::endl;
     std::cout << "--- path_x ---" << std::endl;
@@ -634,7 +640,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     std::cout << ref_y << std::endl;
     std::cout << "--- path_yaw ---" << std::endl;
     std::cout << ref_yaw << std::endl;
-    
+    */
 
     // 7(x, y, yaw, v, omega, omega_r, omega_l), 2(domega_r, domega_l)
     size_t n_variables = 7 * T + 2 * (T - 1);
@@ -867,6 +873,7 @@ void MPCPathTracker::path_callback(const nav_msgs::PathConstPtr& msg)
 {
     std::cout << "path callback" << std::endl;
     path = *msg;
+
 }
 
 void MPCPathTracker::process(void)
@@ -885,6 +892,23 @@ void MPCPathTracker::process(void)
         pose.pose.position.y = 0;
         pose.pose.orientation = transform.transform.rotation;
         transformed = true;
+        //debug
+        //std::cout<<"--- before tf ---"<< std::endl;
+        if(first_sub){
+            std::cout<<"=========world frame path origin=========="<<std::endl;
+            std::cout<<path.poses[0].pose.position.x<<std::endl;
+            std::cout<<path.poses[0].pose.position.y<<std::endl;
+            first_sub=false;
+        }
+        //std::cout<<path.poses[0].pose.position.x<<std::endl; 
+
+        for(auto &pose : path.poses){
+            pose.pose.position.x -= transform.transform.translation.x;
+            pose.pose.position.y -= transform.transform.translation.y;
+        }
+        // std::cout<<"--- after tf ---"<<  std::endl;
+        // std::cout<<path.poses[0].pose.position.x<<std::endl; 
+        
     }catch(tf::TransformException &ex){
         std::cout << ex.what() << std::endl;
     }
@@ -918,7 +942,7 @@ void MPCPathTracker::process(void)
             geometry_msgs::Twist velocity;
             velocity.linear.x = result[0];
             velocity.angular.z = result[1];
-            std::cout << velocity << std::endl;
+            //std::cout << velocity << std::endl;
             velocity_pub.publish(velocity);
             // mpc表示
             geometry_msgs::PoseArray mpc_path;
@@ -940,7 +964,7 @@ void MPCPathTracker::process(void)
     previous_pose = current_pose;
 }
 
-void MPCPathTracker::path_to_vector(void)
+void MPCPathTracker::path_to_vector(void)  //calc_ref_trajectory
 {
     int m = VREF * DT / RESOLUTION + 1;// TODO:delete 1
     int index = 0;
