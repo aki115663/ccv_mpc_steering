@@ -1,5 +1,5 @@
-# cmake_minimum_required(VERSION 3.0.2)
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.0.2)
+#cmake_minimum_required(VERSION 3.5)
 project(ccv_mpc_steering)
 #set(CMAKE_CXX_STANDARD 17)
 if(NOT CMAKE_CXX_STANDARD)
@@ -21,7 +21,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   tf2
   tf2_ros
-  geometry_msgs
   sensor_msgs
   rospy
 )
@@ -159,7 +158,10 @@ include
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(ccv_mpc_steering src/ccv_mpc_steering.cpp)
+add_executable(generate_path src/generate_path.cpp)
+add_executable(diff_drive_mpc src/diff_drive_mpc.cpp)
 target_compile_definitions(ccv_mpc_steering PRIVATE HAVE_STDDEF_H)
+target_compile_definitions(diff_drive_mpc PRIVATE HAVE_STDDEF_H)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -172,9 +174,18 @@ target_compile_definitions(ccv_mpc_steering PRIVATE HAVE_STDDEF_H)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(ccv_mpc_steering ${catkin_LIBRARIES})
+target_link_libraries(generate_path ${catkin_LIBRARIES})
+target_link_libraries(diff_drive_mpc ${catkin_LIBRARIES})
 
 if(${IPOPT_FOUND})
   target_link_libraries(ccv_mpc_steering
+    ${catkin_LIBRARIES}
+    ${IPOPT_LIBRARIES}
+  )
+  endif()
+
+  if(${IPOPT_FOUND})
+  target_link_libraries(diff_drive_mpc
     ${catkin_LIBRARIES}
     ${IPOPT_LIBRARIES}
   )

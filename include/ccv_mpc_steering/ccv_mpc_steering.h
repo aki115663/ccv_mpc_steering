@@ -129,6 +129,7 @@ private:
     double steering_angle_r;
     double omega_l;
     double omega_r;
+
     Eigen::VectorXd path_x;
     Eigen::VectorXd path_y;
     Eigen::VectorXd path_yaw;
