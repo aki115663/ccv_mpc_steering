@@ -376,23 +376,102 @@ FG_eval::FG_eval(Eigen::VectorXd ref_x, Eigen::VectorXd ref_y, Eigen::VectorXd r
 void FG_eval::operator()(ADvector& fg, const ADvector& vars)
 {
     std::cout << "FG_eval() start" << std::endl;
-    // cost
+    // コスト
     fg[0] = 0;
-    // state
+#if 0
+    // 初期条件
+    fg[1 + x_start] = vars[x_start];
+    fg[1 + y_start] = vars[y_start];
+    fg[1 + yaw_start] = vars[yaw_start];
+    fg[1 + v_start] = vars[v_start];
+    fg[1 + omega_start] = vars[omega_start];
+    fg[1 + omega_r_start] = vars[omega_r_start];
+    fg[1 + omega_l_start] = vars[omega_l_start];
+    fg[1 + steer_r_start] = vars[steer_r_start];
+    fg[1 + steer_l_start] = vars[steer_l_start]; 
+
+    for(int i=0; i<T-1; i++){
+        //t+1
+        AD<double> x1 = vars[x_start + i + 1];
+        AD<double> y1 = vars[y_start + i + 1];
+        AD<double> yaw1 = vars[yaw_start + i + 1];
+        AD<double> v1 = vars[v_start + i + 1];
+        AD<double> omega1 = vars[omega_start + i + 1];
+        AD<double> omega_r1 = vars[omega_r_start + i + 1];
+        AD<double> omega_l1 = vars[omega_l_start + i + 1];
+        AD<double> steer_r1 = vars[steer_r_start + i + 1];
+        AD<double> steer_l1 = vars[steer_l_start + i + 1];
+        //t
+        AD<double> x0 = vars[x_start + i];
+        AD<double> y0 = vars[y_start + i];
+        AD<double> yaw0 = vars[yaw_start + i];
+        AD<double> v0 = vars[v_start + i];
+        AD<double> omega0 = vars[omega_start + i];
+        AD<double> omega_r0 = vars[omega_r_start + i];
+        AD<double> omega_l0 = vars[omega_l_start + i];
+        AD<double> steer_r0 = vars[steer_r_start + i];
+        AD<double> steer_l0 = vars[steer_l_start + i];
+        //入力ホライゾンはt+1を考慮しない
+        AD<double> domega_r0 = vars[domega_r_start + i];
+        AD<double> domega_l0 = vars[domega_l_start + i];
+        AD<double> dsteer_r0 = vars[dsteer_r_start + i];
+        AD<double> dsteer_l0 = vars[dsteer_l_start + i];
+
+        double epsilon = std::numeric_limits<double>::epsilon();  //0割確認用
+        //base_linkを基準にした x-y 速度
+        AD<double> vx1 = (WHEEL_RADIUS / 2) * (CppAD::cos(steer_l1) * omega_l1 + CppAD::cos(steer_r1) * omega_r1);
+        AD<double> vy1 = (WHEEL_RADIUS / 2) * (CppAD::sin(steer_l1) * omega_l1 + CppAD::sin(steer_r1) * omega_r1);
+        AD<double> vx0 = (WHEEL_RADIUS / 2) * (CppAD::cos(steer_l0) * omega_l0 + CppAD::cos(steer_r0) * omega_r0);
+        AD<double> vy0 = (WHEEL_RADIUS / 2) * (CppAD::sin(steer_l0) * omega_l0 + CppAD::sin(steer_r0) * omega_r0);
+        // AD<double> v = CppAD::sqrt( CppAD::pow(vx1, 2) + CppAD::pow(vy1, 2) );
+        AD<double> v=CppAD::sqrt(vx1*vx1 + vy1*vy1);
+        AD<double> R;
+
+        if(CppAD::sin(CppAD::abs(steer_r1 - steer_l1)) < epsilon){
+            R = 0.501;
+            // std::cout << "R=TREAD(1) "<< i << std::endl;
+        }
+        else{
+            AD<double> Rr = CppAD::sin(CppAD::abs(steer_l1)) / CppAD::sin(CppAD::abs(steer_r1 - steer_l1)) * TREAD;
+            AD<double> Rl = CppAD::sin(CppAD::abs(steer_r1)) / CppAD::sin(CppAD::abs(steer_l1 - steer_r1)) * TREAD;
+            R = CppAD::abs(Rr - Rl);
+            if(R < epsilon){
+                // std::cout << "R=TREAD(2) "<< i << std::endl;
+                R=0.501;
+            }
+        }
+
+        //コスト
+
+        //制約
+        fg[2 + omega_r_start + i] = omega_r1 - (omega_r0 + domega_r0 * DT);
+        fg[2 + omega_l_start + i] = omega_l1 - (omega_l0 + domega_l0 * DT);
+        fg[2 + steer_r_start + i] = steer_r1 - (steer_r0 + dsteer_r0 * DT);
+        fg[2 + steer_l_start + i] = steer_l1 - (steer_l0 + dsteer_l0 * DT);
+        fg[2 + v_start + i] = v1 - (WHEEL_RADIUS / 2.0) * (omega_r1 + omega_l1);
+        fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / TREAD) * (omega_r1 - omega_l1);
+        fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(yaw0) * DT);
+        fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(yaw0) * DT);
+        fg[2 + yaw_start + i] = yaw1 - (yaw0 + omega0 * DT);
+
+
+    }
+
+#endif
+#if 1
     for(int i=0;i<T-1;i++){
         // pathとの距離
+        AD<double> v_direction = vars[yaw_start + i] + (vars[steer_r_start + i] + vars[steer_l_start + i])/2;
         fg[0] += (CppAD::pow(vars[x_start + i] - ref_x[i], 2) + CppAD::pow(vars[y_start + i] - ref_y[i], 2));
         // 向き
         // fg[0] += CppAD::pow(vars[yaw_start + i] - ref_yaw[i], 2);
+        fg[0] += CppAD::pow(v_direction - ref_yaw[i], 2);
         // 速度
         fg[0] += CppAD::pow(VREF - vars[v_start + i], 2);
         //できればステアを切らない
-        fg[0] += CppAD::pow((vars[steer_r_start + i] + vars[steer_l_start + i]), 2);
+        // fg[0] += CppAD::pow((vars[steer_r_start + i] + vars[steer_l_start + i]), 2);
         // 角加速度
         //fg[0] += 0.1 * CppAD::pow(vars[omega_start + i] - vars[omega_start + i+ 1], 2);
-    }
-    // input
-    for(int i=0;i<T-2;i++){
     }
 
     std::cout << "constrains start" << std::endl;
@@ -463,35 +542,23 @@ void FG_eval::operator()(ADvector& fg, const ADvector& vars)
             }
         }
 
-#if 1
+
         fg[2 + omega_r_start + i] = omega_r1 - (omega_r0 + domega_r0 * DT);
         fg[2 + omega_l_start + i] = omega_l1 - (omega_l0 + domega_l0 * DT);
         fg[2 + steer_r_start + i] = steer_r1 - (steer_r0 + dsteer_r0 * DT);
         fg[2 + steer_l_start + i] = steer_l1 - (steer_l0 + dsteer_l0 * DT);
         fg[2 + v_start + i] = v1 - (WHEEL_RADIUS / 2.0) * (omega_r1 + omega_l1);
         // fg[2 + v_start + i] = v1 - v;
-        fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / TREAD) * (omega_r1 - omega_l1);
-        // fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / R ) * (omega_r1 - omega_l1);
-        // fg[2 + x_start + i] = x1 - (x0 + vx0 * CppAD::cos(yaw0) * DT - vy0 * CppAD::sin(yaw0) * DT);
-        // fg[2 + y_start + i] = y1 - (y0 + vx0 * CppAD::sin(yaw0) * DT + vy0 * CppAD::cos(yaw0) * DT);
-        fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(yaw0) * DT);
-        fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(yaw0) * DT);
-        fg[2 + yaw_start + i] = yaw1 - (yaw0 + omega0 * DT);
-#endif
-#if 0
-        fg[2 + omega_r_start + i] = omega_r1 - (omega_r0 + domega_r0 * DT);
-        fg[2 + omega_l_start + i] = omega_l1 - (omega_l0 + domega_l0 * DT);
-        fg[2 + v_start + i] = v1 - (WHEEL_RADIUS / 2.0) * (omega_r1 + omega_l1);
-        fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / TREAD) * (omega_r1 - omega_l1);
-        fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(yaw0) * DT);
-        fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(yaw0) * DT);
+        // fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / TREAD) * (omega_r1 - omega_l1);
+        fg[2 + omega_start + i] = omega1 - (WHEEL_RADIUS / R ) * (omega_r1 - omega_l1);
+        fg[2 + x_start + i] = x1 - (x0 + vx0 * CppAD::cos(yaw0) * DT - vy0 * CppAD::sin(yaw0) * DT);
+        fg[2 + y_start + i] = y1 - (y0 + vx0 * CppAD::sin(yaw0) * DT + vy0 * CppAD::cos(yaw0) * DT);
+        // fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(yaw0) * DT);
+        // fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(yaw0) * DT);
         fg[2 + yaw_start + i] = yaw1 - (yaw0 + omega0 * DT);
 #endif
 
     }
-    // std::cout << "===Num of Constraints===" <<std::endl;
-    // std::cout << fg.size() - 1<< std::endl;
-    //std::cout << "FG_eval() end" << std::endl;
 }
 
 double get_distance(geometry_msgs::PoseStamped& pose0, geometry_msgs::PoseStamped& pose1)
