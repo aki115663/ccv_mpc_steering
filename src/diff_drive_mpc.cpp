@@ -520,17 +520,7 @@ void MPCPathTracker::process(void)
             velocity.angular.z = result[1];
             //std::cout << velocity << std::endl;
             velocity_pub.publish(velocity);
-            //ref_path表示
-            geometry_msgs::PoseArray reference_path;
-            reference_path.header.frame_id = WORLD_FRAME;
-            for(int i=0; i<T; i++){
-                geometry_msgs::Pose temp;
-                temp.position.x = ref_x[i];
-                temp.position.y = ref_y[i];
-                temp.orientation = tf::createQuaternionMsgFromYaw(ref_yaw[i]);
-                reference_path.poses.push_back(temp);
-            }
-            ref_path_pub.publish(reference_path);
+            
             // mpc表示
             geometry_msgs::PoseArray mpc_path;
             mpc_path.header.frame_id = WORLD_FRAME;
