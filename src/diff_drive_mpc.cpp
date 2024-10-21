@@ -210,6 +210,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
         vars_lower_bound[i] = -WHEEL_ANGULAR_ACCELERATION_LIMIT;
         vars_upper_bound[i] = WHEEL_ANGULAR_ACCELERATION_LIMIT;
     }
+
     // 等式制約
     Dvector constraints_lower_bound(n_constraints);
     Dvector constraints_upper_bound(n_constraints);
@@ -252,7 +253,6 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     options += "Numeric max_cpu_time                    0.5\n";
 
     CppAD::ipopt::solve_result<Dvector> solution;
-
     // std::cout << "Optimization start" << std::endl;
     CppAD::ipopt::solve<Dvector, FG_eval>(
             options, vars, vars_lower_bound, vars_upper_bound, constraints_lower_bound,
@@ -262,11 +262,7 @@ std::vector<double> MPC::solve(Eigen::VectorXd state, Eigen::VectorXd ref_x, Eig
     ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
     //std::cout << solution.status << std::endl;
     std::cout << ok << std::endl;
-    //std::cout << solution.x.size() << std::endl;
-
     auto cost = solution.obj_value;
-    std::cout << "Cost " << std::endl;
-    std::cout << cost << std::endl;
 
     if(ok){
         failure_count = 0;
@@ -320,20 +316,34 @@ void FG_eval::operator()(ADvector& fg, const ADvector& vars)
     std::cout << "FG_eval() start" << std::endl;
     // cost
     fg[0] = 0;
-    // state
+    
+    int index_x = 0;
+    int index_y = 0;
     for(int i=0;i<T-1;i++){
         // pathとの距離
-        // fg[0] += (CppAD::pow(vars[x_start + i] - ref_x[i], 2) + CppAD::pow(vars[y_start + i] - ref_y[i], 2));
+        int index = 0;
+        AD<double> min_distance = 100.0;
+        for(int j=0;j<T-1;j++){
+            AD<double> distance = CppAD::pow(vars[x_start + i] - ref_x[j], 2) + CppAD::pow(vars[y_start + i] - ref_y[j], 2);
+            if (distance < min_distance)
+            {
+                min_distance = distance;
+                index = j;
+            }
+        }
+
+
+        //距離
+        fg[0] += 1.2 *(CppAD::pow(vars[x_start + i] - ref_x[index], 2) + CppAD::pow(vars[y_start + i] - ref_y[index], 2));
         // 向き
-        fg[0] += CppAD::pow(vars[yaw_start + i] - ref_yaw[i], 2);
+        //fg[0] += 1.8 * CppAD::pow(vars[yaw_start + i] - ref_yaw[i], 2);
         // 速度
-        // fg[0] += CppAD::pow(VREF - vars[v_start + i], 2);
+        //fg[0] += 0.8 * CppAD::pow(VREF - vars[v_start + i], 2);
         // 角加速度
-        //fg[0] += 0.1 * CppAD::pow(vars[omega_start + i] - vars[omega_start + i+ 1], 2);
+        //fg[0] += 0 * CppAD::pow(vars[omega_start + i] - vars[omega_start + i+ 1], 2);
     }
     // input
-    for(int i=0;i<T-2;i++){
-    }
+
 
     std::cout << "constrains start" << std::endl;
     //constraint
@@ -377,6 +387,7 @@ void FG_eval::operator()(ADvector& fg, const ADvector& vars)
         fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(yaw0) * DT);
         fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(yaw0) * DT);
         fg[2 + yaw_start + i] = yaw1 - (yaw0 + omega0 * DT);
+    
     }
     //std::cout << "===Num of Constraints===" <<std::endl;
     //std::cout << fg.size() - 1<< std::endl;
@@ -412,7 +423,6 @@ void MPCPathTracker::calc_ref_trajectory()
         double y2 = path.poses[i+1].pose.position.y;
         yaw[i] = atan2(y2-y1, x2-x1);
         // std::cout<<"=== ATAN ==="<<std::endl;
-        // std::cout<< yaw[i] <<std::endl;
     }
     yaw.push_back(yaw[-1]);
 
@@ -510,15 +520,13 @@ void MPCPathTracker::process(void)
             calc_ref_trajectory();
             //path_to_vector();
             //std::cout<<"===Current X==="<<std::endl;
-            //std::cout<<current_pose.pose.position.x<<std::endl;
             auto result = mpc.solve(state, ref_x, ref_y, ref_yaw);
             //std::cout << "===KYORI===" << std::endl;
-            //std::cout << CppAD::pow(result[2]-current_pose.pose.position.x, 2) + CppAD::pow(result[3]-current_pose.pose.position.y, 2)<< std::endl;
-            //std::cout << "solved" << std::endl;
             geometry_msgs::Twist velocity;
             velocity.linear.x = result[0];
             velocity.angular.z = result[1];
-            //std::cout << velocity << std::endl;
+
+        
             velocity_pub.publish(velocity);
             
             // mpc表示
@@ -552,6 +560,7 @@ void MPCPathTracker::process(void)
 
 int main(int argc, char** argv)
 {
+    std::cout <<"maxvelo"<< MAX_VELOCITY << std::endl;
     ros::init(argc, argv, "diff_drive_mpc");
     ros::NodeHandle local_nh("~");
 
@@ -588,7 +597,6 @@ int main(int argc, char** argv)
 
     while(ros::ok()){
         mpc_path_tracker.process();
-
         ros::spinOnce();
         loop_rate.sleep();
     }
